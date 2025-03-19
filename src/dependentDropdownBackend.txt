@@ -1,0 +1,79 @@
+import React, { useState, useEffect } from "react";
+
+const DependentDropdown = ({
+  onSelectionChange,
+  labels = [],
+  placeholder = "Select",
+}) => {
+  const [data, setData] = useState(null); // Store the fetched data
+  const [selections, setSelections] = useState({});
+  
+  useEffect(() => {
+    // Fetch data from backend
+    fetch("/api/locations")  // Replace with your backend URL
+      .then((response) => response.json())
+      .then((data) => {
+        setData(data); // Set the fetched data in state
+        // Initialize selections state based on the levels (country, state, city)
+        const levels = Object.keys(data);  // Example: ["USA", "Canada"]
+        setSelections(levels.reduce((acc, level) => ({ ...acc, [level]: "" }), {}));
+      })
+      .catch((error) => console.error("Error fetching data:", error));
+  }, []); // Empty array means this effect runs once when the component mounts
+
+  const handleChange = (levelIndex) => (e) => {
+    const newValue = e.target.value;
+    const newSelections = { ...selections };
+    newSelections[Object.keys(selections)[levelIndex]] = newValue;
+
+    // Reset following levels
+    for (let i = levelIndex + 1; i < Object.keys(selections).length; i++) {
+      newSelections[Object.keys(selections)[i]] = "";
+    }
+
+    setSelections(newSelections);
+    onSelectionChange?.(newSelections);
+  };
+
+  const getOptions = (levelIndex) => {
+    if (!data) return []; // If no data, return empty array
+
+    let currentLevel = data;
+    const levels = Object.keys(selections);
+    for (let i = 0; i < levelIndex; i++) {
+      const selection = selections[levels[i]];
+      if (!selection || !currentLevel[selection]) {
+        return [];
+      }
+      currentLevel = currentLevel[selection];
+    }
+    return Object.keys(currentLevel || {});
+  };
+
+  if (!data) return <div>Loading...</div>; // Show loading if data is not fetched yet
+
+  return (
+    <div>
+      {Object.keys(selections).map((level, index) => (
+        <div key={level}>
+          {index > 0 && <br />}
+          <label htmlFor={level}>{labels[index] || level}: </label>
+          <select
+            id={level}
+            value={selections[level]}
+            onChange={handleChange(index)}
+          >
+            <option value="">{placeholder} {labels[index] || level}</option>
+            {getOptions(index).map((option) => (
+              <option key={option} value={option}>
+                {option}
+              </option>
+            ))}
+          </select>
+        </div>
+      ))}
+    </div>
+  );
+};
+
+export default DependentDropdown;
